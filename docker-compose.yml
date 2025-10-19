@@ -5,6 +5,7 @@ services:
     ports:
       - 8000:8000
     volumes:
+      - ./entrypoint.sh:/app/entrypoint.sh
       - ./src:/app
     depends_on:
       db:
