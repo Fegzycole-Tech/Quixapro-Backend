@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 from django.conf import settings
-from mailersend import MailerSendClient, Email, EmailBuilder, EmailContact
+from mailersend import MailerSendClient, EmailBuilder, EmailContact
 
 logger = logging.getLogger(__name__)
 
