@@ -30,6 +30,12 @@ class RegisterSerializer(serializers.Serializer):
     )
     photo_url = serializers.URLField(required=False, allow_blank=True)
 
+    def validate_email(self, value):
+        """Check if email is already in use."""
+        if not UserService.is_email_available(value):
+            raise serializers.ValidationError(constants.ERROR_EMAIL_IN_USE)
+        return value
+
     def validate(self, attrs):
         """Validate password match if provided."""
         password = attrs.get('password')

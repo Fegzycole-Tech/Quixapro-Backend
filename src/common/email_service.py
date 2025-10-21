@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 from django.conf import settings
-from mailersend import MailerSendClient, EmailBuilder, EmailContact
+from mailersend import emails
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class EmailService:
         self.api_key = settings.MAILERSEND_API_KEY
         self.from_email = settings.DEFAULT_FROM_EMAIL
         self.from_name = settings.DEFAULT_FROM_NAME
-        self.client = MailerSendClient(api_key=self.api_key)
+        self.mailer = emails.NewEmail(self.api_key)
 
     def send_email(
         self,
@@ -40,18 +40,30 @@ class EmailService:
             True if sent successfully, False otherwise
         """
         try:
-            # Build email
-            email = EmailBuilder()
-            email.set_from(EmailContact(email=self.from_email, name=self.from_name))
-            email.set_to([EmailContact(email=to_email, name=to_name or to_email)])
-            email.set_subject(subject)
-            email.set_text_content(text_content)
+            mail_body = {}
+
+            mail_from = {
+                "name": self.from_name,
+                "email": self.from_email,
+            }
+
+            recipients = [
+                {
+                    "name": to_name or to_email,
+                    "email": to_email,
+                }
+            ]
+
+            self.mailer.set_mail_from(mail_from, mail_body)
+            self.mailer.set_mail_to(recipients, mail_body)
+            self.mailer.set_subject(subject, mail_body)
+            self.mailer.set_plaintext_content(text_content, mail_body)
 
             if html_content:
-                email.set_html_content(html_content)
+                self.mailer.set_html_content(html_content, mail_body)
 
             # Send email
-            self.client.email.send(email.build())
+            self.mailer.send(mail_body)
 
             logger.info(f"Email sent successfully to {to_email}")
             return True
