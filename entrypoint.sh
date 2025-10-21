@@ -1,5 +1,4 @@
 #!/bin/sh
-set -e  # Exit on any error
 
 echo "=== Starting entrypoint script ==="
 echo "Python version: $(python --version)"
@@ -7,12 +6,20 @@ echo "Working directory: $(pwd)"
 echo "Directory contents:"
 ls -la
 
-echo "=== Running migrations ==="
-python manage.py migrate --noinput 2>&1 || {
-    echo "ERROR: Migration failed!"
-    exit 1
-}
+echo "=== Environment variables check ==="
+echo "DB_HOST: $DB_HOST"
+echo "DB_PORT: $DB_PORT"
+echo "POSTGRES_DB: $POSTGRES_DB"
+echo "POSTGRES_USER: $POSTGRES_USER"
+echo "ALLOWED_HOSTS: $ALLOWED_HOSTS"
 
+echo "=== Running migrations ==="
+if ! python manage.py migrate --noinput 2>&1; then
+    echo "ERROR: Migration failed! Check database connection."
+    exit 1
+fi
+
+echo "=== Migrations completed successfully ==="
 echo "=== Starting server with gunicorn ==="
-echo "PORT: ${PORT:-8000}"
-exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 4 --log-level debug
+echo "Binding to 0.0.0.0:${PORT:-8000}"
+exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 4 --log-level debug 2>&1
