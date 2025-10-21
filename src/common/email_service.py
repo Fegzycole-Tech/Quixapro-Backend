@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 from django.conf import settings
-from mailersend import MailerSendClient, Email, EmailContact
+from mailersend import MailerSendClient, Email
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +41,18 @@ class EmailService:
             True if sent successfully, False otherwise
         """
         try:
-            # Build email request
-            mail_from = EmailContact(email=self.from_email, name=self.from_name)
-            recipients = [EmailContact(email=to_email, name=to_name or to_email)]
-
+            # Build email request with plain dictionaries
             email_request = {
-                "from": mail_from.model_dump(),
-                "to": [r.model_dump() for r in recipients],
+                "from": {
+                    "email": self.from_email,
+                    "name": self.from_name,
+                },
+                "to": [
+                    {
+                        "email": to_email,
+                        "name": to_name or to_email,
+                    }
+                ],
                 "subject": subject,
                 "text": text_content,
             }
