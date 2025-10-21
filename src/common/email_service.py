@@ -46,8 +46,8 @@ class EmailService:
             recipients = [EmailContact(email=to_email, name=to_name or to_email)]
 
             email_request = {
-                "from": mail_from.to_dict(),
-                "to": [r.to_dict() for r in recipients],
+                "from": mail_from.model_dump(),
+                "to": [r.model_dump() for r in recipients],
                 "subject": subject,
                 "text": text_content,
             }
