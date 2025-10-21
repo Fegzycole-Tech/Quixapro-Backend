@@ -2,7 +2,6 @@
 
 from typing import Optional
 from django.core.exceptions import ValidationError
-from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, VerificationToken
 from common.email_service import EmailService

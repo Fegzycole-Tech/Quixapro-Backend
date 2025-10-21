@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 from django.conf import settings
-from mailersend import emails
+from mailersend import MailerSendClient, Email, EmailContact
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,8 @@ class EmailService:
         self.api_key = settings.MAILERSEND_API_KEY
         self.from_email = settings.DEFAULT_FROM_EMAIL
         self.from_name = settings.DEFAULT_FROM_NAME
-        self.mailer = emails.NewEmail(self.api_key)
+        self.client = MailerSendClient(api_key=self.api_key)
+        self.email_resource = Email(self.client)
 
     def send_email(
         self,
@@ -40,30 +41,22 @@ class EmailService:
             True if sent successfully, False otherwise
         """
         try:
-            mail_body = {}
+            # Build email request
+            mail_from = EmailContact(email=self.from_email, name=self.from_name)
+            recipients = [EmailContact(email=to_email, name=to_name or to_email)]
 
-            mail_from = {
-                "name": self.from_name,
-                "email": self.from_email,
+            email_request = {
+                "from": mail_from.to_dict(),
+                "to": [r.to_dict() for r in recipients],
+                "subject": subject,
+                "text": text_content,
             }
 
-            recipients = [
-                {
-                    "name": to_name or to_email,
-                    "email": to_email,
-                }
-            ]
-
-            self.mailer.set_mail_from(mail_from, mail_body)
-            self.mailer.set_mail_to(recipients, mail_body)
-            self.mailer.set_subject(subject, mail_body)
-            self.mailer.set_plaintext_content(text_content, mail_body)
-
             if html_content:
-                self.mailer.set_html_content(html_content, mail_body)
+                email_request["html"] = html_content
 
             # Send email
-            self.mailer.send(mail_body)
+            self.email_resource.send(email_request)
 
             logger.info(f"Email sent successfully to {to_email}")
             return True
