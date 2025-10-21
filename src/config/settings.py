@@ -180,5 +180,5 @@ SPECTACULAR_SETTINGS = {
 
 # Email Configuration (MailerSend)
 MAILERSEND_API_KEY = os.getenv('MAILERSEND_API_KEY', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@quixapro.com')
-DEFAULT_FROM_NAME = os.getenv('DEFAULT_FROM_NAME', 'QuixaPro Team')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'support@quixapro.com')
+DEFAULT_FROM_NAME = os.getenv('DEFAULT_FROM_NAME', 'QuixaPro Support')
