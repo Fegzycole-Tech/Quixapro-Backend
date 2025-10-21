@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 from django.conf import settings
-from mailersend import MailerSendClient, Email
+from mailersend import MailerSendClient, EmailBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,6 @@ class EmailService:
         self.from_email = settings.DEFAULT_FROM_EMAIL
         self.from_name = settings.DEFAULT_FROM_NAME
         self.client = MailerSendClient(api_key=self.api_key)
-        self.email_resource = Email(self.client)
 
     def send_email(
         self,
@@ -41,27 +40,19 @@ class EmailService:
             True if sent successfully, False otherwise
         """
         try:
-            # Build email request with plain dictionaries
-            email_request = {
-                "from": {
-                    "email": self.from_email,
-                    "name": self.from_name,
-                },
-                "to": [
-                    {
-                        "email": to_email,
-                        "name": to_name or to_email,
-                    }
-                ],
-                "subject": subject,
-                "text": text_content,
-            }
+            # Build email using EmailBuilder with chainable API
+            email_builder = (EmailBuilder()
+                .from_email(self.from_email, self.from_name)
+                .to(to_email, to_name or to_email)
+                .subject(subject)
+                .text(text_content))
 
             if html_content:
-                email_request["html"] = html_content
+                email_builder = email_builder.html(html_content)
 
-            # Send email
-            self.email_resource.send(email_request)
+            # Build and send email
+            email_request = email_builder.build()
+            self.client.emails.send(email_request)
 
             logger.info(f"Email sent successfully to {to_email}")
             return True
