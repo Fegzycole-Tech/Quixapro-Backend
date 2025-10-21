@@ -1,11 +1,14 @@
 """Views for user authentication and management."""
 
 from rest_framework import generics, status
-from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from drf_spectacular.utils import extend_schema
+from django.db import transaction
+from django.core.exceptions import ValidationError
 
 from .models import User
 from .serializers import (
@@ -16,6 +19,13 @@ from .serializers import (
 )
 from .services import UserService, TokenService
 from . import constants
+from common.exceptions import EmailSendError
+from common.responses import (
+    success_response,
+    error_response,
+    service_unavailable_response,
+    internal_server_error_response
+)
 
 
 @extend_schema(tags=['Authentication'])
@@ -28,16 +38,33 @@ class RegisterView(generics.CreateAPIView):
     def create(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save()
 
-        # Send verification email
-        UserService.send_verification_email(user)
+        try:
+            with transaction.atomic():
+                user = serializer.save()
 
-        return Response({
-            'user': UserSerializer(user).data,
-            'tokens': UserService.generate_tokens(user),
-            'message': constants.SUCCESS_VERIFICATION_EMAIL_SENT
-        }, status=status.HTTP_201_CREATED)
+                # Send verification email - if this fails, user creation will be rolled back
+                UserService.send_verification_email(user)
+
+            return success_response(
+                data={
+                    'user': UserSerializer(user).data,
+                    'tokens': UserService.generate_tokens(user)
+                },
+                message=constants.SUCCESS_VERIFICATION_EMAIL_SENT,
+                status_code=status.HTTP_201_CREATED
+            )
+
+        except EmailSendError:
+            return service_unavailable_response(
+                detail='User registration failed due to email service error. Please try again later.',
+                error_code='EMAIL_SERVICE_ERROR'
+            )
+        except Exception:
+            return internal_server_error_response(
+                detail='An unexpected error occurred during registration.',
+                error_code='REGISTRATION_ERROR'
+            )
 
 
 @extend_schema(tags=['Authentication'])
@@ -53,8 +80,17 @@ class LoginView(TokenObtainPairView):
         if email:
             try:
                 UserService.validate_user_can_login(email)
-            except Exception as e:
-                return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            except ValidationError as e:
+                return error_response(
+                    detail=str(e),
+                    error_code='VALIDATION_ERROR',
+                    status_code=status.HTTP_400_BAD_REQUEST
+                )
+            except Exception:
+                return internal_server_error_response(
+                    detail='An unexpected error occurred during login validation.',
+                    error_code='LOGIN_VALIDATION_ERROR'
+                )
 
         return super().post(request)
 
@@ -75,12 +111,21 @@ class LogoutView(APIView):
 
         try:
             TokenService.blacklist_token(serializer.validated_data['refresh_token'])
-            return Response(
-                {'message': constants.SUCCESS_LOGGED_OUT},
-                status=status.HTTP_200_OK
+            return success_response(
+                message=constants.SUCCESS_LOGGED_OUT,
+                status_code=status.HTTP_200_OK
             )
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except (InvalidToken, TokenError):
+            return error_response(
+                detail='Invalid or expired refresh token.',
+                error_code='INVALID_TOKEN',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception:
+            return internal_server_error_response(
+                detail='An unexpected error occurred during logout.',
+                error_code='LOGOUT_ERROR'
+            )
 
 
 @extend_schema(tags=['Authentication'])
@@ -123,20 +168,32 @@ class ChangePasswordView(APIView):
         request=ChangePasswordSerializer
     )
     def post(self, request):
-        # Business validation
         try:
+            # Business validation
             UserService.validate_user_can_change_password(request.user)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Data validation
-        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
+            # Data validation
+            serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+            serializer.is_valid(raise_exception=True)
 
-        # Execute business logic
-        UserService.change_password(request.user, serializer.validated_data['new_password'])
+            # Execute business logic
+            UserService.change_password(request.user, serializer.validated_data['new_password'])
 
-        return Response({'message': constants.SUCCESS_PASSWORD_CHANGED}, status=status.HTTP_200_OK)
+            return success_response(
+                message=constants.SUCCESS_PASSWORD_CHANGED,
+                status_code=status.HTTP_200_OK
+            )
+        except (ValidationError, DRFValidationError) as e:
+            return error_response(
+                detail=str(e),
+                error_code='VALIDATION_ERROR',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception:
+            return internal_server_error_response(
+                detail='An unexpected error occurred while changing password.',
+                error_code='PASSWORD_CHANGE_ERROR'
+            )
 
 
 @extend_schema(tags=['User Management'])
@@ -174,11 +231,26 @@ class ForgotPasswordView(APIView):
 
         try:
             UserService.request_password_reset(serializer.validated_data['email'])
-            return Response({
-                'message': constants.SUCCESS_PASSWORD_RESET_EMAIL_SENT
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return success_response(
+                message=constants.SUCCESS_PASSWORD_RESET_EMAIL_SENT,
+                status_code=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return error_response(
+                detail=str(e),
+                error_code='VALIDATION_ERROR',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except EmailSendError:
+            return service_unavailable_response(
+                detail='Password reset email could not be sent. Please try again later.',
+                error_code='EMAIL_SERVICE_ERROR'
+            )
+        except Exception:
+            return internal_server_error_response(
+                detail='An unexpected error occurred during password reset request.',
+                error_code='PASSWORD_RESET_REQUEST_ERROR'
+            )
 
 
 class ResetPasswordView(APIView):
@@ -201,11 +273,21 @@ class ResetPasswordView(APIView):
                 serializer.validated_data['token'],
                 serializer.validated_data['new_password']
             )
-            return Response({
-                'message': constants.SUCCESS_PASSWORD_RESET
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return success_response(
+                message=constants.SUCCESS_PASSWORD_RESET,
+                status_code=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return error_response(
+                detail=str(e),
+                error_code='VALIDATION_ERROR',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception:
+            return internal_server_error_response(
+                detail='An unexpected error occurred during password reset.',
+                error_code='PASSWORD_RESET_ERROR'
+            )
 
 
 class VerifyEmailView(APIView):
@@ -228,11 +310,21 @@ class VerifyEmailView(APIView):
                 code=serializer.validated_data['code'],
                 user=request.user
             )
-            return Response({
-                'message': constants.SUCCESS_EMAIL_VERIFIED
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return success_response(
+                message=constants.SUCCESS_EMAIL_VERIFIED,
+                status_code=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return error_response(
+                detail=str(e),
+                error_code='VALIDATION_ERROR',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception:
+            return internal_server_error_response(
+                detail='An unexpected error occurred during email verification.',
+                error_code='EMAIL_VERIFICATION_ERROR'
+            )
 
 
 class ResendVerificationView(APIView):
@@ -248,8 +340,23 @@ class ResendVerificationView(APIView):
     def post(self, request):
         try:
             UserService.send_verification_email(request.user)
-            return Response({
-                'message': constants.SUCCESS_VERIFICATION_CODE_RESENT
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return success_response(
+                message=constants.SUCCESS_VERIFICATION_CODE_RESENT,
+                status_code=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return error_response(
+                detail=str(e),
+                error_code='VALIDATION_ERROR',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except EmailSendError:
+            return service_unavailable_response(
+                detail='Verification email could not be sent. Please try again later.',
+                error_code='EMAIL_SERVICE_ERROR'
+            )
+        except Exception:
+            return internal_server_error_response(
+                detail='An unexpected error occurred while resending verification code.',
+                error_code='RESEND_VERIFICATION_ERROR'
+            )

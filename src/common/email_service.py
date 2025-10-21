@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 from django.conf import settings
 from mailersend import MailerSendClient, EmailBuilder
+from .exceptions import EmailSendError
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class EmailService:
         text_content: str,
         html_content: Optional[str] = None,
         to_name: Optional[str] = None
-    ) -> bool:
+    ) -> None:
         """
         Send an email via MailerSend.
 
@@ -36,8 +37,8 @@ class EmailService:
             html_content: Optional HTML email content
             to_name: Optional recipient name
 
-        Returns:
-            True if sent successfully, False otherwise
+        Raises:
+            EmailSendError: If email sending fails
         """
         try:
             # Build email using EmailBuilder with chainable API
@@ -55,13 +56,13 @@ class EmailService:
             self.client.emails.send(email_request)
 
             logger.info(f"Email sent successfully to {to_email}")
-            return True
 
         except Exception as e:
-            logger.error(f"Failed to send email to {to_email}: {str(e)}")
-            return False
+            error_msg = f"Failed to send email to {to_email}: {str(e)}"
+            logger.error(error_msg)
+            raise EmailSendError(error_msg, email=to_email) from e
 
-    def send_verification_email(self, to_email: str, to_name: str, verification_code: str) -> bool:
+    def send_verification_email(self, to_email: str, to_name: str, verification_code: str) -> None:
         """
         Send email verification code.
 
@@ -70,8 +71,8 @@ class EmailService:
             to_name: Recipient name
             verification_code: 4-digit verification code
 
-        Returns:
-            True if sent successfully, False otherwise
+        Raises:
+            EmailSendError: If email sending fails
         """
         subject = "Verify Your Email Address"
 
@@ -90,7 +91,7 @@ Best regards,
 QuixaPro Team
         """.strip()
 
-        return self.send_email(
+        self.send_email(
             to_email=to_email,
             subject=subject,
             text_content=text_content,
@@ -103,7 +104,7 @@ QuixaPro Team
         to_name: str,
         reset_token: str,
         reset_url: Optional[str] = None
-    ) -> bool:
+    ) -> None:
         """
         Send password reset email.
 
@@ -113,8 +114,8 @@ QuixaPro Team
             reset_token: Password reset token
             reset_url: Optional custom reset URL
 
-        Returns:
-            True if sent successfully, False otherwise
+        Raises:
+            EmailSendError: If email sending fails
         """
         subject = "Password Reset Request"
 
@@ -152,7 +153,7 @@ Best regards,
 The Team
             """.strip()
 
-        return self.send_email(
+        self.send_email(
             to_email=to_email,
             subject=subject,
             text_content=text_content,
