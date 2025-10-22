@@ -1,11 +1,14 @@
 """Business logic for user operations."""
 
+import logging
 from typing import Optional
 from django.core.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, VerificationToken
 from common.email_service import EmailService
 from . import constants
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -26,12 +29,14 @@ class UserService:
         Returns:
             Created User instance
         """
-        return User.objects.create_user(
+        user = User.objects.create_user(
             email=email,
             name=name,
             password=password,
             photo_url=photo_url
         )
+        logger.info(f"User created: {email} (social auth: {password is None})")
+        return user
 
     @staticmethod
     def generate_tokens(user: User) -> dict:
@@ -95,6 +100,7 @@ class UserService:
         """
         user.set_password(new_password)
         user.save()
+        logger.info(f"Password changed for user: {user.email}")
 
     @staticmethod
     def validate_user_can_login(email: str) -> User:
@@ -113,9 +119,11 @@ class UserService:
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
+            logger.warning(f"Login attempt with non-existent email: {email}")
             raise ValidationError("Invalid credentials")
 
         if not user.has_usable_password():
+            logger.warning(f"Password login attempt for social auth user: {email}")
             raise ValidationError(constants.ERROR_SOCIAL_AUTH_LOGIN)
 
         return user
@@ -132,6 +140,7 @@ class UserService:
             ValidationError: If user uses social auth
         """
         if not user.has_usable_password():
+            logger.warning(f"Password change attempt for social auth user: {user.email}")
             raise ValidationError(constants.ERROR_SOCIAL_AUTH_PASSWORD_CHANGE)
 
     @staticmethod
@@ -148,17 +157,21 @@ class UserService:
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
+            logger.warning(f"Password reset requested for non-existent user: {email}")
             raise ValidationError(constants.ERROR_USER_NOT_FOUND)
 
         if not user.has_usable_password():
+            logger.warning(f"Password reset requested for social auth user: {email}")
             raise ValidationError(constants.ERROR_SOCIAL_AUTH_PASSWORD_RESET)
 
         # Invalidate any existing unused password reset tokens
-        VerificationToken.objects.filter(
+        invalidated_count = VerificationToken.objects.filter(
             user=user,
             token_type=VerificationToken.TOKEN_TYPE_PASSWORD_RESET,
             is_used=False
         ).update(is_used=True)
+        if invalidated_count > 0:
+            logger.info(f"Invalidated {invalidated_count} existing password reset tokens for user: {email}")
 
         # Create new token
         reset_token = VerificationToken.create_for_password_reset(user)
@@ -170,6 +183,7 @@ class UserService:
             to_name=user.name,
             reset_token=reset_token.token
         )
+        logger.info(f"Password reset token created and email sent for user: {email}")
 
     @staticmethod
     def reset_password(token: str, new_password: str) -> None:
@@ -189,9 +203,11 @@ class UserService:
                 token_type=VerificationToken.TOKEN_TYPE_PASSWORD_RESET
             )
         except VerificationToken.DoesNotExist:
+            logger.warning(f"Password reset attempted with invalid token: {token[:10]}...")
             raise ValidationError(constants.ERROR_INVALID_RESET_TOKEN)
 
         if not reset_token.is_valid():
+            logger.warning(f"Password reset attempted with expired token for user: {reset_token.user.email}")
             raise ValidationError(constants.ERROR_INVALID_RESET_TOKEN)
 
         # Reset the password
@@ -202,6 +218,8 @@ class UserService:
         # Mark token as used
         reset_token.is_used = True
         reset_token.save()
+
+        logger.info(f"Password reset successfully for user: {user.email}")
 
     @staticmethod
     def send_verification_email(user: User) -> VerificationToken:
@@ -218,14 +236,17 @@ class UserService:
             ValidationError: If email is already verified
         """
         if user.email_verified:
+            logger.warning(f"Verification email requested for already verified user: {user.email}")
             raise ValidationError(constants.ERROR_EMAIL_ALREADY_VERIFIED)
 
         # Invalidate any existing unused email verification codes
-        VerificationToken.objects.filter(
+        invalidated_count = VerificationToken.objects.filter(
             user=user,
             token_type=VerificationToken.TOKEN_TYPE_EMAIL,
             is_used=False
         ).update(is_used=True)
+        if invalidated_count > 0:
+            logger.info(f"Invalidated {invalidated_count} existing verification codes for user: {user.email}")
 
         # Create new verification code
         verification_token = VerificationToken.create_for_email_verification(user)
@@ -238,6 +259,7 @@ class UserService:
             verification_code=verification_token.token
         )
 
+        logger.info(f"Verification email sent to user: {user.email}")
         return verification_token
 
     @staticmethod
@@ -259,9 +281,11 @@ class UserService:
                 token_type=VerificationToken.TOKEN_TYPE_EMAIL
             )
         except VerificationToken.DoesNotExist:
+            logger.warning(f"Email verification attempted with invalid code for user: {user.email}")
             raise ValidationError(constants.ERROR_INVALID_VERIFICATION_CODE)
 
         if not verification_token.is_valid():
+            logger.warning(f"Email verification attempted with expired code for user: {user.email}")
             raise ValidationError(constants.ERROR_INVALID_VERIFICATION_CODE)
 
         # Mark email as verified
@@ -271,6 +295,8 @@ class UserService:
         # Mark code as used
         verification_token.is_used = True
         verification_token.save()
+
+        logger.info(f"Email verified successfully for user: {user.email}")
 
 
 class TokenService:
@@ -289,3 +315,4 @@ class TokenService:
         """
         token = RefreshToken(refresh_token)
         token.blacklist()
+        logger.info(f"Refresh token blacklisted: {refresh_token[:20]}...")

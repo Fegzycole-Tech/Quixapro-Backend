@@ -9,3 +9,7 @@ drf-spectacular==0.28.0
 mailersend==2.0.0
 whitenoise==6.8.2
 python-dotenv==1.0.1
+django-allauth==65.3.0
+dj-rest-auth==7.0.0
+requests-oauthlib==2.0.0
+cryptography==44.0.0

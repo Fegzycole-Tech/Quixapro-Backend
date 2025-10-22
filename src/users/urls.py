@@ -14,6 +14,7 @@ from .views import (
     VerifyEmailView,
     ResendVerificationView,
 )
+from .social_views import GoogleLoginView
 
 app_name = 'users'
 
@@ -23,6 +24,9 @@ urlpatterns = [
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/logout/', LogoutView.as_view(), name='logout'),
     path('auth/refresh/', RefreshTokenView.as_view(), name='token_refresh'),
+
+    # Social authentication endpoints
+    path('auth/google/', GoogleLoginView.as_view(), name='google_login'),
 
     # User profile endpoints
     path('profile/', UserProfileView.as_view(), name='profile'),
