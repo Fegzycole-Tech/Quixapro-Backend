@@ -160,3 +160,11 @@ class ResendVerificationSerializer(serializers.Serializer):
 
     # No fields needed - will use authenticated user
     pass
+
+
+class GoogleAuthSerializer(serializers.Serializer):
+    """Serializer for Google OAuth authentication."""
+
+    access_token = serializers.CharField(required=True)
+    code = serializers.CharField(required=False)
+    id_token = serializers.CharField(required=False)
