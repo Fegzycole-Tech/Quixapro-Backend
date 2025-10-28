@@ -31,6 +31,27 @@ from common.responses import (
 )
 
 
+def create_authenticated_response(user: User, message: str = None):
+    """
+    Create a standardized authenticated response with user data and tokens.
+
+    Args:
+        user: User instance
+        message: Optional success message
+
+    Returns:
+        Success response with user data and JWT tokens
+    """
+    return success_response(
+        data={
+            'user': UserSerializer(user).data,
+            'tokens': UserService.generate_tokens(user)
+        },
+        message=message,
+        status_code=status.HTTP_200_OK
+    )
+
+
 @extend_schema(tags=['Authentication'])
 class RegisterView(generics.CreateAPIView):
     """Register a new user (password or social auth)."""
@@ -51,8 +72,7 @@ class RegisterView(generics.CreateAPIView):
             logger.info(f"User registered successfully: {user.email}")
             return success_response(
                 data={
-                    'user': UserSerializer(user).data,
-                    'tokens': UserService.generate_tokens(user)
+                    'user': UserSerializer(user).data
                 },
                 message=constants.SUCCESS_VERIFICATION_EMAIL_SENT,
                 status_code=status.HTTP_201_CREATED
@@ -324,7 +344,7 @@ class VerifyEmailView(APIView):
     @extend_schema(
         tags=['Email Verification'],
         request=VerifyEmailSerializer,
-        description="Verify email address using your email and the 4-digit code sent to your email. No authentication required."
+        description="Verify email address using your email and the 4-digit code sent to your email. Returns JWT tokens for automatic login. No authentication required."
     )
     def post(self, request):
         serializer = VerifyEmailSerializer(data=request.data)
@@ -335,11 +355,10 @@ class VerifyEmailView(APIView):
                 email=serializer.validated_data['email'],
                 code=serializer.validated_data['code']
             )
+
             logger.info(f"Email verified successfully for user: {user.email}")
-            return success_response(
-                message=constants.SUCCESS_EMAIL_VERIFIED,
-                status_code=status.HTTP_200_OK
-            )
+            # Automatically log user in after successful verification
+            return create_authenticated_response(user, constants.SUCCESS_EMAIL_VERIFIED)
         except ValidationError as e:
             logger.warning(f"Email verification failed: {str(e)}")
             return error_response(
@@ -364,7 +383,7 @@ class ResendVerificationView(APIView):
     @extend_schema(
         tags=['Email Verification'],
         request=ResendVerificationSerializer,
-        description="Resend verification code to the specified email address. No authentication required."
+        description="Resend verification code to the specified email address."
     )
     def post(self, request):
         serializer = ResendVerificationSerializer(data=request.data)
@@ -373,29 +392,24 @@ class ResendVerificationView(APIView):
         email = serializer.validated_data['email']
 
         try:
-            user = User.objects.get(email=email)
-
-            if user.email_verified:
-                logger.warning(f"Verification email requested for already verified user: {user.email}")
-                raise ValidationError(constants.ERROR_EMAIL_ALREADY_VERIFIED)
-
-            UserService.send_verification_email(user)
-            logger.info(f"Verification code resent to user: {user.email}")
+            UserService.resend_verification_email(email)
+            logger.info(f"Verification code resent to user: {email}")
             return success_response(
                 message=constants.SUCCESS_VERIFICATION_CODE_RESENT,
                 status_code=status.HTTP_200_OK
             )
-        except User.DoesNotExist:
-            logger.warning(f"Resend verification requested for non-existent email: {email}")
-            return error_response(
-                detail='No account found with this email address.',
-                error_code='USER_NOT_FOUND',
-                status_code=status.HTTP_404_NOT_FOUND
-            )
         except ValidationError as e:
             logger.warning(f"Resend verification failed for {email}: {str(e)}")
+            error_detail = str(e)
+
+            if constants.ERROR_USER_NOT_FOUND in error_detail:
+                return error_response(
+                    detail='No account found with this email address.',
+                    error_code='USER_NOT_FOUND',
+                    status_code=status.HTTP_404_NOT_FOUND
+                )
             return error_response(
-                detail=str(e),
+                detail=error_detail,
                 error_code='VALIDATION_ERROR',
                 status_code=status.HTTP_400_BAD_REQUEST
             )

@@ -35,7 +35,7 @@ class RegisterViewTest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIn('user', response.data)
-        self.assertIn('tokens', response.data)
+        self.assertNotIn('tokens', response.data)  # Tokens not returned on registration
         self.assertIn('message', response.data)
         self.assertEqual(response.data['message'], constants.SUCCESS_VERIFICATION_EMAIL_SENT)
 
@@ -439,6 +439,13 @@ class VerifyEmailViewTest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['message'], constants.SUCCESS_EMAIL_VERIFIED)
+
+        # Verify response contains user data and tokens
+        self.assertIn('user', response.data)
+        self.assertIn('tokens', response.data)
+        self.assertEqual(response.data['user']['email'], 'test@example.com')
+        self.assertIn('access', response.data['tokens'])
+        self.assertIn('refresh', response.data['tokens'])
 
         # Verify email was marked as verified
         self.user.refresh_from_db()

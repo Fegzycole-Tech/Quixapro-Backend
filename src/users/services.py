@@ -263,6 +263,29 @@ class UserService:
         return verification_token
 
     @staticmethod
+    def resend_verification_email(email: str) -> VerificationToken:
+        """
+        Resend verification email to user by email address.
+
+        Args:
+            email: User's email address
+
+        Returns:
+            VerificationToken instance
+
+        Raises:
+            ValidationError: If user doesn't exist or email is already verified
+        """
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            logger.warning(f"Resend verification requested for non-existent email: {email}")
+            raise ValidationError(constants.ERROR_USER_NOT_FOUND)
+
+        # send_verification_email already checks if email is verified
+        return UserService.send_verification_email(user)
+
+    @staticmethod
     def verify_email(email: str, code: str) -> User:
         """
         Verify user email using verification code.
