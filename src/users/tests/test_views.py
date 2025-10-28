@@ -427,12 +427,13 @@ class VerifyEmailViewTest(APITestCase):
             password='testpass123'
         )
         self.verification_token = VerificationToken.create_for_email_verification(self.user)
-        self.tokens = UserService.generate_tokens(self.user)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.tokens["access"]}')
 
     def test_verify_email_success(self):
-        """Test successful email verification."""
-        data = {'code': self.verification_token.token}
+        """Test successful email verification without authentication."""
+        data = {
+            'email': 'test@example.com',
+            'code': self.verification_token.token
+        }
 
         response = self.client.post(self.url, data, format='json')
 
@@ -449,7 +450,10 @@ class VerifyEmailViewTest(APITestCase):
 
     def test_verify_email_invalid_code_fails(self):
         """Test email verification with invalid code fails."""
-        data = {'code': '9999'}
+        data = {
+            'email': 'test@example.com',
+            'code': '9999'
+        }
 
         response = self.client.post(self.url, data, format='json')
 
@@ -458,6 +462,53 @@ class VerifyEmailViewTest(APITestCase):
         # Verify email was not marked as verified
         self.user.refresh_from_db()
         self.assertFalse(self.user.email_verified)
+
+    def test_verify_email_invalid_email_fails(self):
+        """Test email verification with non-existent email fails."""
+        data = {
+            'email': 'nonexistent@example.com',
+            'code': '1234'
+        }
+
+        response = self.client.post(self.url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_verify_email_mismatched_code_fails(self):
+        """Test verification fails when code doesn't match email."""
+        other_user = User.objects.create_user(
+            email='other@example.com',
+            name='Other User',
+            password='testpass123'
+        )
+        other_token = VerificationToken.create_for_email_verification(other_user)
+
+        data = {
+            'email': 'test@example.com',
+            'code': other_token.token
+        }
+
+        response = self.client.post(self.url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Verify email was not marked as verified
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.email_verified)
+
+    def test_verify_email_already_verified_fails(self):
+        """Test verification fails for already verified user."""
+        self.user.email_verified = True
+        self.user.save()
+
+        data = {
+            'email': 'test@example.com',
+            'code': self.verification_token.token
+        }
+        response = self.client.post(self.url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('detail', response.data)
 
 
 class ResendVerificationViewTest(APITestCase):
@@ -472,16 +523,15 @@ class ResendVerificationViewTest(APITestCase):
             name='Test User',
             password='testpass123'
         )
-        self.tokens = UserService.generate_tokens(self.user)
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.tokens["access"]}')
 
     @patch('users.services.EmailService')
     def test_resend_verification_success(self, mock_email_service):
-        """Test successful verification code resend."""
+        """Test successful verification code resend without authentication."""
         mock_instance = MagicMock()
         mock_email_service.return_value = mock_instance
 
-        response = self.client.post(self.url, format='json')
+        data = {'email': 'test@example.com'}
+        response = self.client.post(self.url, data, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['message'], constants.SUCCESS_VERIFICATION_CODE_RESENT)
@@ -495,9 +545,19 @@ class ResendVerificationViewTest(APITestCase):
         self.user.email_verified = True
         self.user.save()
 
-        response = self.client.post(self.url, format='json')
+        data = {'email': 'test@example.com'}
+        response = self.client.post(self.url, data, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_resend_verification_nonexistent_user_fails(self):
+        """Test resending verification for non-existent user returns error."""
+        data = {'email': 'nonexistent@example.com'}
+        response = self.client.post(self.url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn('detail', response.data)
+        self.assertEqual(response.data['error_code'], 'USER_NOT_FOUND')
 
 
 class UserListViewTest(APITestCase):

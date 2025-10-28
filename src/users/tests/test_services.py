@@ -183,12 +183,15 @@ class UserServiceTest(TestCase):
         self.assertIn(constants.ERROR_EMAIL_ALREADY_VERIFIED, str(cm.exception))
 
     def test_verify_email_success(self):
-        """Test verifying email with valid code."""
+        """Test verifying email with valid email and code."""
         # Create verification token
         token = VerificationToken.create_for_email_verification(self.user)
 
-        # Verify email
-        UserService.verify_email(token.token, self.user)
+        # Verify email using email and code
+        returned_user = UserService.verify_email(self.user.email, token.token)
+
+        # Verify correct user was returned
+        self.assertEqual(returned_user.id, self.user.id)
 
         # Verify email marked as verified
         self.user.refresh_from_db()
@@ -201,9 +204,42 @@ class UserServiceTest(TestCase):
     def test_verify_email_invalid_code(self):
         """Test verifying email with invalid code."""
         with self.assertRaises(ValidationError) as cm:
-            UserService.verify_email('9999', self.user)
+            UserService.verify_email(self.user.email, '9999')
 
         self.assertIn(constants.ERROR_INVALID_VERIFICATION_CODE, str(cm.exception))
+
+    def test_verify_email_invalid_email(self):
+        """Test verifying email with non-existent email."""
+        with self.assertRaises(ValidationError) as cm:
+            UserService.verify_email('nonexistent@example.com', '1234')
+
+        self.assertIn(constants.ERROR_INVALID_VERIFICATION_CODE, str(cm.exception))
+
+    def test_verify_email_mismatched_code(self):
+        """Test verifying email with code belonging to different user."""
+        other_user = User.objects.create_user(
+            email='other@example.com',
+            name='Other User',
+            password='testpass123'
+        )
+        token = VerificationToken.create_for_email_verification(other_user)
+
+        with self.assertRaises(ValidationError) as cm:
+            UserService.verify_email(self.user.email, token.token)
+
+        self.assertIn(constants.ERROR_INVALID_VERIFICATION_CODE, str(cm.exception))
+
+    def test_verify_email_already_verified(self):
+        """Test verifying email for already verified user."""
+        self.user.email_verified = True
+        self.user.save()
+
+        token = VerificationToken.create_for_email_verification(self.user)
+
+        with self.assertRaises(ValidationError) as cm:
+            UserService.verify_email(self.user.email, token.token)
+
+        self.assertIn(constants.ERROR_EMAIL_ALREADY_VERIFIED, str(cm.exception))
 
 
 class TokenServiceTest(TestCase):

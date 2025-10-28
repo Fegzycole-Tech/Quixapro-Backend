@@ -128,6 +128,7 @@ class ResetPasswordSerializer(serializers.Serializer):
 class VerifyEmailSerializer(serializers.Serializer):
     """Serializer for email verification."""
 
+    email = serializers.EmailField()
     code = serializers.CharField(min_length=4, max_length=4)
 
     def validate_code(self, value):
@@ -140,8 +141,7 @@ class VerifyEmailSerializer(serializers.Serializer):
 class ResendVerificationSerializer(serializers.Serializer):
     """Serializer for resending verification email."""
 
-    # No fields needed - will use authenticated user
-    pass
+    email = serializers.EmailField()
 
 
 class GoogleAuthSerializer(serializers.Serializer):

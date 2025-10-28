@@ -46,7 +46,6 @@ class RegisterView(generics.CreateAPIView):
             with transaction.atomic():
                 user = serializer.save()
 
-                # Send verification email - if this fails, user creation will be rolled back
                 UserService.send_verification_email(user)
 
             logger.info(f"User registered successfully: {user.email}")
@@ -186,14 +185,11 @@ class ChangePasswordView(APIView):
     )
     def post(self, request):
         try:
-            # Business validation
             UserService.validate_user_can_change_password(request.user)
 
-            # Data validation
             serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
             serializer.is_valid(raise_exception=True)
 
-            # Execute business logic
             UserService.change_password(request.user, serializer.validated_data['new_password'])
 
             logger.info(f"Password changed successfully for user: {request.user.email}")
@@ -322,37 +318,37 @@ class ResetPasswordView(APIView):
 class VerifyEmailView(APIView):
     """Verify email address with code."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
     serializer_class = VerifyEmailSerializer
 
     @extend_schema(
         tags=['Email Verification'],
         request=VerifyEmailSerializer,
-        description="Verify email address using the 4-digit code sent to your email."
+        description="Verify email address using your email and the 4-digit code sent to your email. No authentication required."
     )
     def post(self, request):
         serializer = VerifyEmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         try:
-            UserService.verify_email(
-                code=serializer.validated_data['code'],
-                user=request.user
+            user = UserService.verify_email(
+                email=serializer.validated_data['email'],
+                code=serializer.validated_data['code']
             )
-            logger.info(f"Email verified successfully for user: {request.user.email}")
+            logger.info(f"Email verified successfully for user: {user.email}")
             return success_response(
                 message=constants.SUCCESS_EMAIL_VERIFIED,
                 status_code=status.HTTP_200_OK
             )
         except ValidationError as e:
-            logger.warning(f"Email verification failed for user {request.user.email}: {str(e)}")
+            logger.warning(f"Email verification failed: {str(e)}")
             return error_response(
                 detail=str(e),
                 error_code='VALIDATION_ERROR',
                 status_code=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
-            logger.error(f"Unexpected error during email verification for user {request.user.email}: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error during email verification: {str(e)}", exc_info=True)
             return internal_server_error_response(
                 detail='An unexpected error occurred during email verification.',
                 error_code='EMAIL_VERIFICATION_ERROR'
@@ -362,36 +358,55 @@ class VerifyEmailView(APIView):
 class ResendVerificationView(APIView):
     """Resend email verification code."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
     serializer_class = ResendVerificationSerializer
 
     @extend_schema(
         tags=['Email Verification'],
-        description="Resend verification code to your email address."
+        request=ResendVerificationSerializer,
+        description="Resend verification code to the specified email address. No authentication required."
     )
     def post(self, request):
+        serializer = ResendVerificationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email']
+
         try:
-            UserService.send_verification_email(request.user)
-            logger.info(f"Verification code resent to user: {request.user.email}")
+            user = User.objects.get(email=email)
+
+            if user.email_verified:
+                logger.warning(f"Verification email requested for already verified user: {user.email}")
+                raise ValidationError(constants.ERROR_EMAIL_ALREADY_VERIFIED)
+
+            UserService.send_verification_email(user)
+            logger.info(f"Verification code resent to user: {user.email}")
             return success_response(
                 message=constants.SUCCESS_VERIFICATION_CODE_RESENT,
                 status_code=status.HTTP_200_OK
             )
+        except User.DoesNotExist:
+            logger.warning(f"Resend verification requested for non-existent email: {email}")
+            return error_response(
+                detail='No account found with this email address.',
+                error_code='USER_NOT_FOUND',
+                status_code=status.HTTP_404_NOT_FOUND
+            )
         except ValidationError as e:
-            logger.warning(f"Resend verification failed for user {request.user.email}: {str(e)}")
+            logger.warning(f"Resend verification failed for {email}: {str(e)}")
             return error_response(
                 detail=str(e),
                 error_code='VALIDATION_ERROR',
                 status_code=status.HTTP_400_BAD_REQUEST
             )
         except EmailSendError as e:
-            logger.error(f"Email service error while resending verification for user {request.user.email}: {str(e)}")
+            logger.error(f"Email service error while resending verification for {email}: {str(e)}")
             return service_unavailable_response(
                 detail='Verification email could not be sent. Please try again later.',
                 error_code='EMAIL_SERVICE_ERROR'
             )
         except Exception as e:
-            logger.error(f"Unexpected error while resending verification code for user {request.user.email}: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error while resending verification code for {email}: {str(e)}", exc_info=True)
             return internal_server_error_response(
                 detail='An unexpected error occurred while resending verification code.',
                 error_code='RESEND_VERIFICATION_ERROR'

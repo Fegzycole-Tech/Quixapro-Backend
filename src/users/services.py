@@ -263,25 +263,42 @@ class UserService:
         return verification_token
 
     @staticmethod
-    def verify_email(code: str, user: User) -> None:
+    def verify_email(email: str, code: str) -> User:
         """
         Verify user email using verification code.
 
         Args:
+            email: User's email address
             code: 4-digit verification code
-            user: User instance
+
+        Returns:
+            User: The user whose email was verified
 
         Raises:
-            ValidationError: If code is invalid or expired
+            ValidationError: If code is invalid, expired, or doesn't match the email
         """
+        # First verify the user exists
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            logger.warning(f"Email verification attempted for non-existent email: {email}")
+            raise ValidationError(constants.ERROR_INVALID_VERIFICATION_CODE)
+
+        # Check if user is already verified
+        if user.email_verified:
+            logger.warning(f"Email verification attempted for already verified user: {user.email}")
+            raise ValidationError(constants.ERROR_EMAIL_ALREADY_VERIFIED)
+
+        # Get verification token for this specific user and code
         try:
             verification_token = VerificationToken.objects.get(
-                token=code,
                 user=user,
-                token_type=VerificationToken.TOKEN_TYPE_EMAIL
+                token=code,
+                token_type=VerificationToken.TOKEN_TYPE_EMAIL,
+                is_used=False
             )
         except VerificationToken.DoesNotExist:
-            logger.warning(f"Email verification attempted with invalid code for user: {user.email}")
+            logger.warning(f"Email verification attempted with invalid code for user: {email}")
             raise ValidationError(constants.ERROR_INVALID_VERIFICATION_CODE)
 
         if not verification_token.is_valid():
@@ -297,6 +314,7 @@ class UserService:
         verification_token.save()
 
         logger.info(f"Email verified successfully for user: {user.email}")
+        return user
 
 
 class TokenService:
