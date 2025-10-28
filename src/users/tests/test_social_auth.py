@@ -17,7 +17,7 @@ class GoogleAuthViewTest(APITestCase):
     def setUp(self):
         """Set up test client and Google social app."""
         self.client = APIClient()
-        self.url = '/api/users/auth/google/'
+        self.url = '/api/auth/google/'
 
         # Create site for allauth
         self.site = Site.objects.get_current()

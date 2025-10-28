@@ -24,10 +24,6 @@ class RegisterSerializer(serializers.Serializer):
         write_only=True, required=False, allow_blank=True,
         validators=[validate_password], style={'input_type': 'password'}
     )
-    password_confirm = serializers.CharField(
-        write_only=True, required=False, allow_blank=True,
-        style={'input_type': 'password'}
-    )
     photo_url = serializers.URLField(required=False, allow_blank=True)
 
     def validate_email(self, value):
@@ -36,22 +32,8 @@ class RegisterSerializer(serializers.Serializer):
             raise serializers.ValidationError(constants.ERROR_EMAIL_IN_USE)
         return value
 
-    def validate(self, attrs):
-        """Validate password match if provided."""
-        password = attrs.get('password')
-        password_confirm = attrs.get('password_confirm')
-
-        if (password or password_confirm) and password != password_confirm:
-            raise serializers.ValidationError({"password": constants.ERROR_PASSWORD_MISMATCH})
-
-        if password_confirm and not password:
-            raise serializers.ValidationError({"password": constants.ERROR_PASSWORD_REQUIRED})
-
-        return attrs
-
     def create(self, validated_data):
         """Create user via service layer."""
-        validated_data.pop('password_confirm', None)
         return UserService.create_user(**validated_data)
 
 
