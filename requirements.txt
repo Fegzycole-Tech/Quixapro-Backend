@@ -13,3 +13,5 @@ django-allauth==65.3.0
 dj-rest-auth==7.0.0
 requests-oauthlib==2.0.0
 cryptography==44.0.0
+pybars3==0.9.7
+django-cors-headers==4.6.0

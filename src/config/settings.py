@@ -37,6 +37,30 @@ CSRF_TRUSTED_ORIGINS = [
     f'https://{host}' for host in ALLOWED_HOSTS if host
 ]
 
+# CORS Settings
+CORS_ALLOWED_ORIGINS = [
+    'https://quixapro.com',
+    'https://www.quixapro.com',
+    'http://localhost:3000',  # For local development
+    'http://localhost:5173',  # For Vite local development
+]
+
+# Allow credentials (cookies, authorization headers, etc.)
+CORS_ALLOW_CREDENTIALS = True
+
+# Additional CORS headers that might be needed
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
 
 # Application definition
 
@@ -49,6 +73,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sites',  # Required by allauth
     # Third party apps
+    'corsheaders',  # CORS headers
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -71,6 +96,7 @@ SITE_ID = 1
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware - must be before CommonMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

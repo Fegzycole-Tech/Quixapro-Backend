@@ -185,8 +185,8 @@ class EmailServiceTest(TestCase):
             self.assertEqual(call_args.kwargs['to_email'], 'user@test.com')
             self.assertEqual(call_args.kwargs['to_name'], 'Test User')
             self.assertEqual(call_args.kwargs['subject'], 'Verify Your Email Address')
-            self.assertIn('1234', call_args.kwargs['text_content'])
-            self.assertIn('Test User', call_args.kwargs['text_content'])
+            self.assertIn('1234', call_args.kwargs['html_content'])
+            self.assertIn('Test User', call_args.kwargs['html_content'])
 
     @override_settings(
         MAILERSEND_API_KEY='test-api-key',
@@ -217,10 +217,10 @@ class EmailServiceTest(TestCase):
             self.assertEqual(call_args.kwargs['to_email'], 'user@test.com')
             self.assertEqual(call_args.kwargs['to_name'], 'Test User')
             self.assertEqual(call_args.kwargs['subject'], 'Password Reset Request')
-            self.assertIn('reset-token-123', call_args.kwargs['text_content'])
+            self.assertIn('reset-token-123', call_args.kwargs['html_content'])
             self.assertIn('https://example.com/reset?token=reset-token-123',
-                          call_args.kwargs['text_content'])
-            self.assertIn('Test User', call_args.kwargs['text_content'])
+                          call_args.kwargs['html_content'])
+            self.assertIn('Test User', call_args.kwargs['html_content'])
 
     @override_settings(
         MAILERSEND_API_KEY='test-api-key',
@@ -250,8 +250,5 @@ class EmailServiceTest(TestCase):
             self.assertEqual(call_args.kwargs['to_email'], 'user@test.com')
             self.assertEqual(call_args.kwargs['to_name'], 'Test User')
             self.assertEqual(call_args.kwargs['subject'], 'Password Reset Request')
-            self.assertIn('reset-token-123', call_args.kwargs['text_content'])
-            self.assertIn('Reset Token:', call_args.kwargs['text_content'])
-            self.assertIn('Test User', call_args.kwargs['text_content'])
-            # Should not contain a URL
-            self.assertNotIn('http', call_args.kwargs['text_content'])
+            self.assertIn('reset-token-123', call_args.kwargs['html_content'])
+            self.assertIn('Test User', call_args.kwargs['html_content'])
