@@ -103,7 +103,8 @@ class EmailService:
 
         html_content = self._render_template('verification_email.html', {
             'name': to_name,
-            'verification_code': verification_code
+            'verification_code': verification_code,
+            'logo_url': settings.LOGO_URL,
         })
 
         self.send_email(
@@ -142,7 +143,8 @@ class EmailService:
         html_content = self._render_template('password_reset_email.html', {
             'name': to_name,
             'reset_token': reset_token,
-            'reset_url': full_reset_url
+            'reset_url': full_reset_url,
+            'logo_url': settings.LOGO_URL,
         })
 
         self.send_email(
