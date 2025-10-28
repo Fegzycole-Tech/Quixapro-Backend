@@ -58,8 +58,7 @@ class RegisterSerializerTest(TestCase):
         data = {
             'email': 'new@example.com',
             'name': 'New User',
-            'password': 'SecurePass123!',
-            'password_confirm': 'SecurePass123!'
+            'password': 'SecurePass123!'
         }
         serializer = RegisterSerializer(data=data)
         self.assertTrue(serializer.is_valid())
@@ -73,36 +72,13 @@ class RegisterSerializerTest(TestCase):
         serializer = RegisterSerializer(data=data)
         self.assertTrue(serializer.is_valid())
 
-    def test_password_mismatch_fails(self):
-        """Test password mismatch raises validation error."""
-        data = {
-            'email': 'new@example.com',
-            'name': 'New User',
-            'password': 'SecurePass123!',
-            'password_confirm': 'DifferentPass123!'
-        }
-        serializer = RegisterSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('password', serializer.errors)
-
-    def test_password_confirm_without_password_fails(self):
-        """Test providing password_confirm without password fails."""
-        data = {
-            'email': 'new@example.com',
-            'name': 'New User',
-            'password_confirm': 'SecurePass123!'
-        }
-        serializer = RegisterSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('password', serializer.errors)
 
     def test_invalid_email_fails(self):
         """Test invalid email format fails."""
         data = {
             'email': 'not-an-email',
             'name': 'New User',
-            'password': 'SecurePass123!',
-            'password_confirm': 'SecurePass123!'
+            'password': 'SecurePass123!'
         }
         serializer = RegisterSerializer(data=data)
         self.assertFalse(serializer.is_valid())
@@ -113,8 +89,7 @@ class RegisterSerializerTest(TestCase):
         data = {
             'email': 'new@example.com',
             'name': 'New User',
-            'password': '123',
-            'password_confirm': '123'
+            'password': '123'
         }
         serializer = RegisterSerializer(data=data)
         self.assertFalse(serializer.is_valid())
@@ -125,8 +100,7 @@ class RegisterSerializerTest(TestCase):
         data = {
             'email': 'new@example.com',
             'name': 'New User',
-            'password': 'SecurePass123!',
-            'password_confirm': 'SecurePass123!'
+            'password': 'SecurePass123!'
         }
         serializer = RegisterSerializer(data=data)
         self.assertTrue(serializer.is_valid())

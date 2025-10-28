@@ -16,7 +16,7 @@ class RegisterViewTest(APITestCase):
 
     def setUp(self):
         """Set up test client."""
-        self.url = reverse('users:register')
+        self.url = reverse('auth:register')
         self.client = APIClient()
 
     @patch('users.services.EmailService')
@@ -28,8 +28,7 @@ class RegisterViewTest(APITestCase):
         data = {
             'email': 'newuser@example.com',
             'name': 'New User',
-            'password': 'SecurePass123!',
-            'password_confirm': 'SecurePass123!'
+            'password': 'SecurePass123!'
         }
 
         response = self.client.post(self.url, data, format='json')
@@ -67,19 +66,6 @@ class RegisterViewTest(APITestCase):
         user = User.objects.get(email='social@example.com')
         self.assertFalse(user.has_usable_password())
 
-    def test_register_password_mismatch_fails(self):
-        """Test registration with mismatched passwords fails."""
-        data = {
-            'email': 'newuser@example.com',
-            'name': 'New User',
-            'password': 'SecurePass123!',
-            'password_confirm': 'DifferentPass123!'
-        }
-
-        response = self.client.post(self.url, data, format='json')
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertFalse(User.objects.filter(email='newuser@example.com').exists())
 
 
 class LoginViewTest(APITestCase):
@@ -87,7 +73,7 @@ class LoginViewTest(APITestCase):
 
     def setUp(self):
         """Set up test user and client."""
-        self.url = reverse('users:login')
+        self.url = reverse('auth:login')
         self.client = APIClient()
         self.user = User.objects.create_user(
             email='test@example.com',
@@ -143,7 +129,7 @@ class LogoutViewTest(APITestCase):
 
     def setUp(self):
         """Set up test user and authentication."""
-        self.url = reverse('users:logout')
+        self.url = reverse('auth:logout')
         self.client = APIClient()
         self.user = User.objects.create_user(
             email='test@example.com',
@@ -326,7 +312,7 @@ class ForgotPasswordViewTest(APITestCase):
 
     def setUp(self):
         """Set up test user."""
-        self.url = reverse('users:forgot_password')
+        self.url = reverse('auth:forgot_password')
         self.client = APIClient()
         self.user = User.objects.create_user(
             email='test@example.com',
@@ -385,7 +371,7 @@ class ResetPasswordViewTest(APITestCase):
 
     def setUp(self):
         """Set up test user and reset token."""
-        self.url = reverse('users:reset_password')
+        self.url = reverse('auth:reset_password')
         self.client = APIClient()
         self.user = User.objects.create_user(
             email='test@example.com',
@@ -433,7 +419,7 @@ class VerifyEmailViewTest(APITestCase):
 
     def setUp(self):
         """Set up test user and verification token."""
-        self.url = reverse('users:verify_email')
+        self.url = reverse('auth:verify_email')
         self.client = APIClient()
         self.user = User.objects.create_user(
             email='test@example.com',
@@ -479,7 +465,7 @@ class ResendVerificationViewTest(APITestCase):
 
     def setUp(self):
         """Set up test user."""
-        self.url = reverse('users:resend_verification')
+        self.url = reverse('auth:resend_verification')
         self.client = APIClient()
         self.user = User.objects.create_user(
             email='test@example.com',
