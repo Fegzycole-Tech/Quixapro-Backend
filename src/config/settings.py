@@ -28,6 +28,7 @@ load_dotenv(BASE_DIR.parent / '.env')
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-epumm@mneg9k8*^t*!))l*($z6-%fr#p3ggtaj0qy5mokd+i(r')
 
 LOGO_URL = os.getenv('LOGO_URL', '')
+PASSWORD_RESET_URL = os.getenv('PASSWORD_RESET_URL', 'https://www.quixapro.com/reset-password')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False') == 'True'

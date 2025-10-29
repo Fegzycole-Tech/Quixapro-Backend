@@ -129,16 +129,19 @@ class EmailService:
             to_email: Recipient email address
             to_name: Recipient name
             reset_token: Password reset token
-            reset_url: Optional custom reset URL
+            reset_url: Optional custom reset URL (will append email and token as query params)
 
         Raises:
             EmailSendError: If email sending fails
         """
+        from urllib.parse import urlencode
+
         subject = "Password Reset Request"
 
         full_reset_url = None
         if reset_url:
-            full_reset_url = f"{reset_url}?token={reset_token}"
+            params = {'email': to_email, 'token': reset_token}
+            full_reset_url = f"{reset_url}?{urlencode(params)}"
 
         html_content = self._render_template('password_reset_email.html', {
             'name': to_name,

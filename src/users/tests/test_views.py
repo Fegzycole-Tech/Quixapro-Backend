@@ -383,9 +383,9 @@ class ResetPasswordViewTest(APITestCase):
     def test_reset_password_success(self):
         """Test successful password reset."""
         data = {
+            'email': self.user.email,
             'token': self.reset_token.token,
-            'new_password': 'NewSecurePass123!',
-            'new_password_confirm': 'NewSecurePass123!'
+            'new_password': 'NewSecurePass123!'
         }
 
         response = self.client.post(self.url, data, format='json')
@@ -404,9 +404,28 @@ class ResetPasswordViewTest(APITestCase):
     def test_reset_password_invalid_token_fails(self):
         """Test password reset with invalid token fails."""
         data = {
+            'email': self.user.email,
             'token': 'invalid-token',
-            'new_password': 'NewSecurePass123!',
-            'new_password_confirm': 'NewSecurePass123!'
+            'new_password': 'NewSecurePass123!'
+        }
+
+        response = self.client.post(self.url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reset_password_email_token_mismatch_fails(self):
+        """Test password reset with email/token mismatch fails."""
+        # Create another user
+        other_user = User.objects.create_user(
+            email='other@example.com',
+            name='Other User',
+            password='password123'
+        )
+
+        data = {
+            'email': other_user.email,
+            'token': self.reset_token.token,  # Token belongs to self.user
+            'new_password': 'NewSecurePass123!'
         }
 
         response = self.client.post(self.url, data, format='json')

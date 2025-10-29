@@ -137,12 +137,12 @@ class UserServiceTest(TestCase):
         self.assertIn(constants.ERROR_SOCIAL_AUTH_PASSWORD_RESET, str(cm.exception))
 
     def test_reset_password_success(self):
-        """Test resetting password with valid token."""
+        """Test resetting password with valid email and token."""
         # Create reset token
         reset_token = VerificationToken.create_for_password_reset(self.user)
 
         # Reset password
-        UserService.reset_password(reset_token.token, 'newpassword123')
+        UserService.reset_password(self.user.email, reset_token.token, 'newpassword123')
 
         # Verify password changed
         self.user.refresh_from_db()
@@ -155,7 +155,31 @@ class UserServiceTest(TestCase):
     def test_reset_password_invalid_token(self):
         """Test resetting password with invalid token."""
         with self.assertRaises(ValidationError) as cm:
-            UserService.reset_password('invalid-token', 'newpassword123')
+            UserService.reset_password(self.user.email, 'invalid-token', 'newpassword123')
+
+        self.assertIn(constants.ERROR_INVALID_RESET_TOKEN, str(cm.exception))
+
+    def test_reset_password_invalid_email(self):
+        """Test resetting password with invalid email."""
+        reset_token = VerificationToken.create_for_password_reset(self.user)
+        with self.assertRaises(ValidationError) as cm:
+            UserService.reset_password('wrong@example.com', reset_token.token, 'newpassword123')
+
+        self.assertIn(constants.ERROR_INVALID_RESET_TOKEN, str(cm.exception))
+
+    def test_reset_password_email_token_mismatch(self):
+        """Test resetting password with email/token mismatch."""
+        # Create another user and token
+        other_user = User.objects.create_user(
+            email='other@example.com',
+            name='Other User',
+            password='password123'
+        )
+        reset_token = VerificationToken.create_for_password_reset(self.user)
+
+        # Try to use token with different user's email
+        with self.assertRaises(ValidationError) as cm:
+            UserService.reset_password(other_user.email, reset_token.token, 'newpassword123')
 
         self.assertIn(constants.ERROR_INVALID_RESET_TOKEN, str(cm.exception))
 

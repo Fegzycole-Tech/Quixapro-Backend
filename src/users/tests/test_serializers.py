@@ -289,30 +289,38 @@ class ResetPasswordSerializerTest(TestCase):
     def test_valid_reset_password(self):
         """Test valid password reset."""
         data = {
+            'email': 'test@example.com',
             'token': 'some-valid-token',
-            'new_password': 'NewSecurePass123!',
-            'new_password_confirm': 'NewSecurePass123!'
+            'new_password': 'NewSecurePass123!'
         }
         serializer = ResetPasswordSerializer(data=data)
         self.assertTrue(serializer.is_valid())
 
-    def test_password_mismatch_fails(self):
-        """Test password mismatch fails."""
+    def test_missing_email_fails(self):
+        """Test missing email fails validation."""
         data = {
             'token': 'some-valid-token',
-            'new_password': 'NewSecurePass123!',
-            'new_password_confirm': 'DifferentPass123!'
+            'new_password': 'NewSecurePass123!'
         }
         serializer = ResetPasswordSerializer(data=data)
         self.assertFalse(serializer.is_valid())
-        self.assertIn('new_password', serializer.errors)
+        self.assertIn('email', serializer.errors)
 
-    def test_weak_password_fails(self):
-        """Test weak password fails validation."""
+    def test_missing_token_fails(self):
+        """Test missing token fails validation."""
         data = {
-            'token': 'some-valid-token',
-            'new_password': '123',
-            'new_password_confirm': '123'
+            'email': 'test@example.com',
+            'new_password': 'NewSecurePass123!'
+        }
+        serializer = ResetPasswordSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('token', serializer.errors)
+
+    def test_missing_password_fails(self):
+        """Test missing password fails validation."""
+        data = {
+            'email': 'test@example.com',
+            'token': 'some-valid-token'
         }
         serializer = ResetPasswordSerializer(data=data)
         self.assertFalse(serializer.is_valid())

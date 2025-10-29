@@ -259,7 +259,7 @@ class ForgotPasswordView(APIView):
     @extend_schema(
         tags=['Password Reset'],
         request=ForgotPasswordSerializer,
-        description="Request a password reset token. An email will be sent with reset instructions."
+        description="Request a password reset token. An email will be sent containing a reset link with the user's email and token. The link format is: {PASSWORD_RESET_URL}?email={email}&token={token}. Token expires in 1 hour."
     )
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
@@ -295,7 +295,7 @@ class ForgotPasswordView(APIView):
 
 
 class ResetPasswordView(APIView):
-    """Reset password using token."""
+    """Reset password using email and token."""
 
     permission_classes = [AllowAny]
     serializer_class = ResetPasswordSerializer
@@ -303,32 +303,34 @@ class ResetPasswordView(APIView):
     @extend_schema(
         tags=['Password Reset'],
         request=ResetPasswordSerializer,
-        description="Reset password using the token received via email."
+        description="Reset password using the email and token received via email. Both email and token must match for successful reset. The token can only be used once and expires after 1 hour. Password validation is handled on the frontend."
     )
     def post(self, request):
         serializer = ResetPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        email = serializer.validated_data['email']
         token = serializer.validated_data['token']
         try:
             UserService.reset_password(
+                email,
                 token,
                 serializer.validated_data['new_password']
             )
-            logger.info(f"Password reset successful using token: {token[:10]}...")
+            logger.info(f"Password reset successful for user: {email}")
             return success_response(
                 message=constants.SUCCESS_PASSWORD_RESET,
                 status_code=status.HTTP_200_OK
             )
         except ValidationError as e:
-            logger.warning(f"Password reset validation failed for token {token[:10]}...: {str(e)}")
+            logger.warning(f"Password reset validation failed for {email}: {str(e)}")
             return error_response(
                 detail=str(e),
                 error_code='VALIDATION_ERROR',
                 status_code=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
-            logger.error(f"Unexpected error during password reset for token {token[:10]}...: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error during password reset for {email}: {str(e)}", exc_info=True)
             return internal_server_error_response(
                 detail='An unexpected error occurred during password reset.',
                 error_code='PASSWORD_RESET_ERROR'

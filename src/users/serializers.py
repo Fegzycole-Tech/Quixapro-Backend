@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from django.contrib.auth.password_validation import validate_password
 from .models import User
 from .services import UserService
 from . import constants
@@ -21,8 +20,7 @@ class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     name = serializers.CharField(max_length=255)
     password = serializers.CharField(
-        write_only=True, required=False, allow_blank=True,
-        validators=[validate_password], style={'input_type': 'password'}
+        write_only=True, required=False, allow_blank=True, style={'input_type': 'password'}
     )
     photo_url = serializers.URLField(required=False, allow_blank=True)
 
@@ -78,17 +76,10 @@ class ChangePasswordSerializer(serializers.Serializer):
     """Serializer for password change."""
 
     old_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
-    new_password = serializers.CharField(
-        write_only=True, validators=[validate_password], style={'input_type': 'password'}
-    )
-    new_password_confirm = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    new_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
     def validate(self, attrs):
-        """Validate passwords match."""
-        if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError({"new_password": constants.ERROR_PASSWORD_MISMATCH})
-
-        # Check old password is correct
+        """Validate old password is correct."""
         user = self.context['request'].user
         if not user.check_password(attrs['old_password']):
             raise serializers.ValidationError({"old_password": constants.ERROR_OLD_PASSWORD_INCORRECT})
@@ -109,20 +100,11 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
 
 class ResetPasswordSerializer(serializers.Serializer):
-    """Serializer for resetting password with token."""
+    """Serializer for resetting password with token and email."""
 
+    email = serializers.EmailField()
     token = serializers.CharField()
-    new_password = serializers.CharField(
-        write_only=True, validators=[validate_password], style={'input_type': 'password'}
-    )
-    new_password_confirm = serializers.CharField(write_only=True, style={'input_type': 'password'})
-
-    def validate(self, attrs):
-        """Validate passwords match."""
-        if attrs['new_password'] != attrs['new_password_confirm']:
-            raise serializers.ValidationError({"new_password": constants.ERROR_PASSWORD_MISMATCH})
-
-        return attrs
+    new_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
 
 class VerifyEmailSerializer(serializers.Serializer):

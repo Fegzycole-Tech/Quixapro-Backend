@@ -3,6 +3,7 @@
 import logging
 from typing import Optional
 from django.core.exceptions import ValidationError
+from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, VerificationToken
 from common.email_service import EmailService
@@ -176,42 +177,52 @@ class UserService:
         # Create new token
         reset_token = VerificationToken.create_for_password_reset(user)
 
-        # Send email
+        # Send email with reset URL including email and token
         email_service = EmailService()
         email_service.send_password_reset_email(
             to_email=user.email,
             to_name=user.name,
-            reset_token=reset_token.token
+            reset_token=reset_token.token,
+            reset_url=settings.PASSWORD_RESET_URL
         )
         logger.info(f"Password reset token created and email sent for user: {email}")
 
     @staticmethod
-    def reset_password(token: str, new_password: str) -> None:
+    def reset_password(email: str, token: str, new_password: str) -> None:
         """
-        Reset user password using a reset token.
+        Reset user password using email and reset token.
 
         Args:
+            email: User's email address
             token: Password reset token
             new_password: New password to set
 
         Raises:
-            ValidationError: If token is invalid or expired
+            ValidationError: If email/token combination is invalid or expired
         """
+        # First verify the user exists
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            logger.warning(f"Password reset attempted with invalid email: {email}")
+            raise ValidationError(constants.ERROR_INVALID_RESET_TOKEN)
+
+        # Get the reset token for this specific user
         try:
             reset_token = VerificationToken.objects.get(
+                user=user,
                 token=token,
                 token_type=VerificationToken.TOKEN_TYPE_PASSWORD_RESET
             )
         except VerificationToken.DoesNotExist:
-            logger.warning(f"Password reset attempted with invalid token: {token[:10]}...")
+            logger.warning(f"Password reset attempted with invalid token for user: {email}")
             raise ValidationError(constants.ERROR_INVALID_RESET_TOKEN)
 
         if not reset_token.is_valid():
-            logger.warning(f"Password reset attempted with expired token for user: {reset_token.user.email}")
+            logger.warning(f"Password reset attempted with expired token for user: {email}")
             raise ValidationError(constants.ERROR_INVALID_RESET_TOKEN)
 
         # Reset the password
-        user = reset_token.user
         user.set_password(new_password)
         user.save()
 
@@ -219,7 +230,7 @@ class UserService:
         reset_token.is_used = True
         reset_token.save()
 
-        logger.info(f"Password reset successfully for user: {user.email}")
+        logger.info(f"Password reset successfully for user: {email}")
 
     @staticmethod
     def send_verification_email(user: User) -> VerificationToken:
