@@ -14,6 +14,7 @@ COPY requirements.txt .
 RUN uv pip install -r requirements.txt --system
 
 COPY entrypoint.sh .
+COPY gunicorn.conf.py .
 RUN chmod +x entrypoint.sh
 
 COPY src/ .

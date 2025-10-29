@@ -1,0 +1,2 @@
+mypy==1.18.2
+django-stubs==5.2.5

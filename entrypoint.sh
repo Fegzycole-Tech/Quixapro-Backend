@@ -29,5 +29,6 @@ fi
 
 echo "=== Static files collected successfully ==="
 echo "=== Starting server with gunicorn ==="
+echo "Using gunicorn config file with optimized settings"
 echo "Binding to 0.0.0.0:${PORT:-8000}"
-exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 4 --log-level debug 2>&1
+exec gunicorn config.wsgi:application -c /app/gunicorn.conf.py 2>&1
