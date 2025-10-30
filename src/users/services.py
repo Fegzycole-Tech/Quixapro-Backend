@@ -1,9 +1,12 @@
 """Business logic for user operations."""
 
 import logging
+import requests
 from typing import Optional
 from django.core.exceptions import ValidationError
 from django.conf import settings
+from django.db import transaction
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import User, VerificationToken
 from common.email_service import EmailService
@@ -349,6 +352,116 @@ class UserService:
 
         logger.info(f"Email verified successfully for user: {user.email}")
         return user
+
+    @staticmethod
+    def authenticate_with_google(access_token: str) -> dict:
+        """
+        Authenticate user with Google OAuth access token.
+
+        Args:
+            access_token: Google OAuth2 access token
+
+        Returns:
+            dict: Dictionary containing user, access_token, and refresh_token
+
+        Raises:
+            AuthenticationFailed: If token is invalid or authentication fails
+        """
+        # Fetch user info from Google
+        user_info = UserService._get_google_user_info(access_token)
+
+        # Get or create user
+        user = UserService._get_or_create_google_user(user_info)
+
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+
+        logger.info(f"Google authentication successful for user: {user.email}")
+
+        return {
+            'user': user,
+            'access_token': str(refresh.access_token),
+            'refresh_token': str(refresh),
+        }
+
+    @staticmethod
+    def _get_google_user_info(access_token: str) -> dict:
+        """
+        Fetch user information from Google using the access token.
+
+        Args:
+            access_token: Google OAuth2 access token
+
+        Returns:
+            dict: User information from Google
+
+        Raises:
+            AuthenticationFailed: If token is invalid or request fails
+        """
+        try:
+            response = requests.get(
+                'https://www.googleapis.com/oauth2/v2/userinfo',
+                headers={'Authorization': f'Bearer {access_token}'},
+                timeout=10
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Google API returned status {response.status_code}: {response.text}")
+                raise AuthenticationFailed('Invalid access token')
+
+            user_info = response.json()
+
+            # Validate required fields
+            if not user_info.get('email'):
+                raise AuthenticationFailed('Email not provided by Google')
+
+            if not user_info.get('verified_email'):
+                raise AuthenticationFailed('Email not verified by Google')
+
+            return user_info
+
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch Google user info: {str(e)}")
+            raise AuthenticationFailed('Failed to verify access token with Google')
+
+    @staticmethod
+    def _get_or_create_google_user(user_info: dict) -> User:
+        """
+        Get or create a user based on Google user information.
+
+        Args:
+            user_info: User information from Google
+
+        Returns:
+            User: The created or existing user
+        """
+        email = user_info['email']
+
+        try:
+            # Try to get existing user
+            user = User.objects.get(email=email)
+            logger.info(f"Existing user found for Google auth: {email}")
+            return user
+
+        except User.DoesNotExist:
+            # Create new user
+            with transaction.atomic():
+                # Extract name from Google user info
+                given_name = user_info.get('given_name', '')
+                family_name = user_info.get('family_name', '')
+                name = f"{given_name} {family_name}".strip() or email.split('@')[0]
+
+                # Create user without password (social auth user)
+                user = User.objects.create_user(
+                    email=email,
+                    name=name,
+                    password=None,  # No password for social auth users
+                    photo_url=user_info.get('picture'),
+                    email_verified=True,  # Google emails are already verified
+                )
+                # Note: password=None makes user.has_usable_password() return False
+                logger.info(f"New user created from Google auth: {email}")
+                return user
 
 
 class TokenService:

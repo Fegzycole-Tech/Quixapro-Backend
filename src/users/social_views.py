@@ -5,14 +5,11 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from drf_spectacular.utils import extend_schema
-from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-from dj_rest_auth.registration.views import SocialLoginView
-from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import AuthenticationFailed, ValidationError
 
-from .serializers import GoogleAuthSerializer
+from .serializers import GoogleAuthSerializer, UserSerializer
+from .services import UserService
 from common.responses import (
     success_response,
     error_response,
@@ -22,7 +19,7 @@ from common.responses import (
 logger = logging.getLogger(__name__)
 
 
-class GoogleLoginView(SocialLoginView):
+class GoogleLoginView(APIView):
     """
     Google OAuth2 login view.
 
@@ -34,9 +31,6 @@ class GoogleLoginView(SocialLoginView):
     3. Receive JWT tokens in response
     """
 
-    adapter_class = GoogleOAuth2Adapter
-    callback_url = settings.SOCIALACCOUNT_PROVIDERS.get('google', {}).get('APP', {}).get('redirect_uri', 'http://localhost:3000/auth/callback')
-    client_class = OAuth2Client
     permission_classes = [AllowAny]
     serializer_class = GoogleAuthSerializer
 
@@ -46,11 +40,61 @@ class GoogleLoginView(SocialLoginView):
         description="""
         Authenticate with Google OAuth2.
 
+        **Request Body:**
+        ```json
+        {
+          "access_token": "ya29.A0ATi6K2sg8r4PavvvPMt4aXPPJ..."
+        }
+        ```
+
+        **Success Response (200 OK):**
+        ```json
+        {
+          "user": {
+            "id": 1,
+            "email": "user@gmail.com",
+            "name": "John Doe",
+            "photo_url": "https://lh3.googleusercontent.com/...",
+            "email_verified": true,
+            "created_at": "2025-10-30T10:00:00Z",
+            "updated_at": "2025-10-30T10:00:00Z"
+          },
+          "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+          "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+          "message": "Successfully authenticated with Google"
+        }
+        ```
+
+        **Error Responses:**
+        - **400 Bad Request** - Missing or invalid access_token
+          ```json
+          {
+            "detail": "{'access_token': ['This field is required.']}",
+            "error_code": "VALIDATION_ERROR"
+          }
+          ```
+
+        - **401 Unauthorized** - Invalid Google token or unverified email
+          ```json
+          {
+            "detail": "Invalid Google access token or authentication failed",
+            "error_code": "INVALID_GOOGLE_TOKEN"
+          }
+          ```
+
+        - **500 Internal Server Error** - Unexpected server error
+          ```json
+          {
+            "detail": "An unexpected error occurred during Google authentication",
+            "error_code": "GOOGLE_AUTH_ERROR"
+          }
+          ```
+
         **Frontend Integration:**
         1. Use Google Sign-In JavaScript library or React Google Login
-        2. Get the access_token from Google
+        2. Get the access_token from Google after successful sign-in
         3. POST the access_token to this endpoint
-        4. Receive JWT tokens (access + refresh) in response
+        4. Store the returned JWT tokens for authenticated API calls
 
         **Example:**
         ```javascript
@@ -58,21 +102,36 @@ class GoogleLoginView(SocialLoginView):
         const googleAccessToken = googleResponse.access_token;
 
         // Send to backend
-        fetch('/api/users/auth/google/', {
+        const response = await fetch('/auth/google/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ access_token: googleAccessToken })
-        })
-        .then(res => res.json())
-        .then(data => {
-          // Use data.access_token and data.refresh_token for API calls
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // Store tokens and user data
           localStorage.setItem('access_token', data.access_token);
           localStorage.setItem('refresh_token', data.refresh_token);
-        });
+          localStorage.setItem('user', JSON.stringify(data.user));
+
+          // User is now authenticated
+          console.log('Logged in as:', data.user.email);
+        } else {
+          // Handle error
+          console.error('Login failed:', data.detail);
+        }
         ```
+
+        **Notes:**
+        - Google users are created with email_verified=true
+        - Google users have no password (social auth only)
+        - If user already exists with the same email, they will be logged in
+        - The access_token must be a valid Google OAuth2 token
         """
     )
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
         """
         Handle Google OAuth login with defensive error handling.
 
@@ -80,23 +139,27 @@ class GoogleLoginView(SocialLoginView):
             Response: Success with JWT tokens or error response
         """
         try:
-            # Call parent class to handle the OAuth flow (includes serializer validation)
-            response = super().post(request, *args, **kwargs)
+            # Validate the request data
+            serializer = GoogleAuthSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
 
-            # If successful, the response will have user and tokens
-            if response.status_code == 200:
-                user_email = response.data.get('user', {}).get('email', 'unknown')
-                logger.info(f"Google login successful for user: {user_email}")
+            access_token = serializer.validated_data['access_token']
 
-                return success_response(
-                    data=response.data,
-                    message='Successfully authenticated with Google',
-                    status_code=status.HTTP_200_OK
-                )
+            # Authenticate with Google via service layer
+            auth_data = UserService.authenticate_with_google(access_token)
 
-            # Log and return unexpected status codes
-            logger.warning(f"Google login returned status {response.status_code}")
-            return response
+            # Prepare response data with serialized user
+            response_data = {
+                'user': UserSerializer(auth_data['user']).data,
+                'access_token': auth_data['access_token'],
+                'refresh_token': auth_data['refresh_token'],
+            }
+
+            return success_response(
+                data=response_data,
+                message='Successfully authenticated with Google',
+                status_code=status.HTTP_200_OK
+            )
 
         except AuthenticationFailed as e:
             logger.warning(f"Google authentication failed: {str(e)}")

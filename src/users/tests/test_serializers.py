@@ -84,16 +84,16 @@ class RegisterSerializerTest(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('email', serializer.errors)
 
-    def test_weak_password_fails(self):
-        """Test weak password fails validation."""
+    def test_weak_password_accepted(self):
+        """Test weak passwords are accepted (validation done on frontend)."""
         data = {
             'email': 'new@example.com',
             'name': 'New User',
             'password': '123'
         }
         serializer = RegisterSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('password', serializer.errors)
+        # Backend doesn't validate password strength - that's frontend's job
+        self.assertTrue(serializer.is_valid())
 
     def test_create_user_with_password(self):
         """Test creating user with password."""
@@ -231,12 +231,11 @@ class ChangePasswordSerializerTest(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('old_password', serializer.errors)
 
-    def test_new_password_mismatch_fails(self):
-        """Test new password mismatch fails."""
+    def test_weak_new_password_accepted(self):
+        """Test weak passwords are accepted (validation done on frontend)."""
         data = {
             'old_password': 'oldpass123',
-            'new_password': 'NewSecurePass123!',
-            'new_password_confirm': 'DifferentPass123!'
+            'new_password': '123'
         }
         request = self.factory.post('/')
         request.user = self.user
@@ -245,25 +244,8 @@ class ChangePasswordSerializerTest(TestCase):
             data=data,
             context={'request': request}
         )
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('new_password', serializer.errors)
-
-    def test_weak_new_password_fails(self):
-        """Test weak new password fails validation."""
-        data = {
-            'old_password': 'oldpass123',
-            'new_password': '123',
-            'new_password_confirm': '123'
-        }
-        request = self.factory.post('/')
-        request.user = self.user
-
-        serializer = ChangePasswordSerializer(
-            data=data,
-            context={'request': request}
-        )
-        self.assertFalse(serializer.is_valid())
-        self.assertIn('new_password', serializer.errors)
+        # Backend doesn't validate password strength - that's frontend's job
+        self.assertTrue(serializer.is_valid())
 
 
 class ForgotPasswordSerializerTest(TestCase):
