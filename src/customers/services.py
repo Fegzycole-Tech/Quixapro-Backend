@@ -7,8 +7,6 @@ logger = logging.getLogger(__name__)
 
 
 class CustomerService:
-    """Service class for customer-related business logic."""
-
     @staticmethod
     def create_customer(data: Dict[str, Any], user) -> Customer:
         """Create a new customer."""
