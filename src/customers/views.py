@@ -1,7 +1,9 @@
 import logging
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+
 from customers.models import Customer
 from customers.serializers import CustomerSerializer
 from customers.services import CustomerService
@@ -14,6 +16,11 @@ class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated]
 
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ["name", "email"]
+    ordering_fields = ["name", "email", "address", "created_at"]
+    ordering = ["-created_at"]
+
     def get_queryset(self):
         return CustomerService.get_user_customers(self.request.user.id)
 
@@ -24,6 +31,15 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="List all customers for the authenticated user",
+        parameters=[
+            OpenApiParameter("name", str, description="Filter by customer name"),
+            OpenApiParameter("email", str, description="Filter by customer email"),
+            OpenApiParameter(
+                "ordering",
+                str,
+                description="Order by one or more fields (e.g. name, -email, created_at)",
+            ),
+        ],
         responses={200: CustomerSerializer(many=True)},
     )
     def list(self, request, *args, **kwargs):
