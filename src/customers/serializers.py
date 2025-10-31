@@ -3,8 +3,6 @@ from .models import Customer
 
 
 class CustomerSerializer(serializers.ModelSerializer):
-    """Serializer for Customer model with formatted timestamps."""
-
     created_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
     updated_at = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S", read_only=True)
 
@@ -12,12 +10,20 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = [
             "id",
-            "user_id",
             "name",
             "email",
             "address",
             "photo_url",
             "created_at",
             "updated_at",
+            "user",
         ]
-        read_only_fields = ["id", "user_id", "created_at", "updated_at"]
+        read_only_fields = ["id", "user", "created_at", "updated_at"]
+
+    def create(self, validated_data):
+        user = self.context.get("user")
+
+        if user:
+            validated_data["user"] = user
+
+        return super().create(validated_data)
