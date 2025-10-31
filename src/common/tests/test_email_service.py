@@ -217,8 +217,8 @@ class EmailServiceTest(TestCase):
             self.assertEqual(call_args.kwargs['to_email'], 'user@test.com')
             self.assertEqual(call_args.kwargs['to_name'], 'Test User')
             self.assertEqual(call_args.kwargs['subject'], 'Password Reset Request')
-            self.assertIn('reset-token-123', call_args.kwargs['html_content'])
-            self.assertIn('https://example.com/reset?token=reset-token-123',
+            # URL now includes both email and token parameters
+            self.assertIn('https://example.com/reset?email=user%40test.com&amp;token=reset-token-123',
                           call_args.kwargs['html_content'])
             self.assertIn('Test User', call_args.kwargs['html_content'])
 
@@ -250,5 +250,7 @@ class EmailServiceTest(TestCase):
             self.assertEqual(call_args.kwargs['to_email'], 'user@test.com')
             self.assertEqual(call_args.kwargs['to_name'], 'Test User')
             self.assertEqual(call_args.kwargs['subject'], 'Password Reset Request')
-            self.assertIn('reset-token-123', call_args.kwargs['html_content'])
+            # When no reset_url is provided, button has empty href
+            self.assertIn('href=""', call_args.kwargs['html_content'])
             self.assertIn('Test User', call_args.kwargs['html_content'])
+            self.assertIn('Reset Your Password', call_args.kwargs['html_content'])
