@@ -21,4 +21,5 @@ urlpatterns = [
     # API Endpoints
     path('auth/', include('users.auth_urls')),
     path('users/', include('users.user_urls')),
+    path('customers/', include('customers.urls')),
 ]
