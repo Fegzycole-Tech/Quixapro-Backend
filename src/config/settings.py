@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     'common',
     'users',
     'customers',
+    'businesses',
 ]
 
 # Required for django-allauth
