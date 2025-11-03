@@ -23,7 +23,7 @@ class TestBusinessViewSet:
         assert response.status_code == 200
         assert len(response.data["results"]) == 1
 
-    def test_create_business(self, client, user):
+    def test_create_business(self, client):
         payload = {
             "name": "John's Business",
             "email": "john@example.com",
@@ -70,3 +70,59 @@ class TestBusinessViewSet:
 
         assert response.status_code == 204
         assert not Business.objects.filter(id=business.id).exists()
+
+    def test_unverified_user_cannot_list_businesses(self, unverified_user):
+        """Test that unverified users cannot list businesses."""
+        client = APIClient()
+        client.force_authenticate(user=unverified_user)
+        response = client.get(self.endpoint)
+        assert response.status_code == 403
+        assert "Email verification required" in str(response.data)
+
+    def test_unverified_user_cannot_create_business(self, unverified_user):
+        """Test that unverified users cannot create businesses."""
+        client = APIClient()
+        client.force_authenticate(user=unverified_user)
+        payload = {
+            "name": "Test Business",
+            "email": "test@example.com",
+            "address": "Test St",
+            "phone_number": "555"
+        }
+        response = client.post(self.endpoint, payload, format="json")
+        assert response.status_code == 403
+        assert "Email verification required" in str(response.data)
+
+    def test_unverified_user_cannot_retrieve_business(self, unverified_user):
+        """Test that unverified users cannot retrieve businesses."""
+        client = APIClient()
+        client.force_authenticate(user=unverified_user)
+        business = Business.objects.create(
+            user=unverified_user, name="Test", email="test@example.com", address="Test St", phone_number="555"
+        )
+        response = client.get(f"{self.endpoint}{business.id}/")
+        assert response.status_code == 403
+        assert "Email verification required" in str(response.data)
+
+    def test_unverified_user_cannot_update_business(self, unverified_user):
+        """Test that unverified users cannot update businesses."""
+        client = APIClient()
+        client.force_authenticate(user=unverified_user)
+        business = Business.objects.create(
+            user=unverified_user, name="Old", email="old@example.com", address="Old St", phone_number="333"
+        )
+        payload = {"name": "New Name"}
+        response = client.patch(f"{self.endpoint}{business.id}/", payload, format="json")
+        assert response.status_code == 403
+        assert "Email verification required" in str(response.data)
+
+    def test_unverified_user_cannot_delete_business(self, unverified_user):
+        """Test that unverified users cannot delete businesses."""
+        client = APIClient()
+        client.force_authenticate(user=unverified_user)
+        business = Business.objects.create(
+            user=unverified_user, name="Del", email="del@example.com", address="Del St", phone_number="444"
+        )
+        response = client.delete(f"{self.endpoint}{business.id}/")
+        assert response.status_code == 403
+        assert "Email verification required" in str(response.data)

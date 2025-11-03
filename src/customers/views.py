@@ -4,9 +4,9 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 
-from customers.models import Customer
 from customers.serializers import CustomerSerializer
 from customers.services import CustomerService
+from common.permissions import IsEmailVerified
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 @extend_schema(tags=["Customer"])
 class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsEmailVerified]
 
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ["name", "email"]
