@@ -31,6 +31,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="List all customers for the authenticated user",
+        description="Returns paginated list of customers. The 'count' field in the response shows the total number of results matching the applied filters.",
         parameters=[
             OpenApiParameter("name", str, description="Filter by customer name"),
             OpenApiParameter("email", str, description="Filter by customer email"),
@@ -39,6 +40,8 @@ class CustomerViewSet(viewsets.ModelViewSet):
                 str,
                 description="Order by one or more fields (e.g. name, -email, created_at)",
             ),
+            OpenApiParameter("limit", int, description="Number of results per page (default: 10)"),
+            OpenApiParameter("offset", int, description="Starting position of the query (default: 0)"),
         ],
         responses={200: CustomerSerializer(many=True)},
     )

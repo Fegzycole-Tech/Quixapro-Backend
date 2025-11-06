@@ -18,6 +18,7 @@ class TestCustomerViewSet:
         response = client.get(self.endpoint)
         assert response.status_code == 200
         assert len(response.data["results"]) == 1
+        assert response.data["count"] == 1
 
     def test_create_customer(self, client):
         payload = {"name": "John", "email": "john@example.com"}
@@ -89,3 +90,39 @@ class TestCustomerViewSet:
         response = client.delete(f"{self.endpoint}{customer.id}/")
         assert response.status_code == 403
         assert "Email verification required" in str(response.data)
+
+    def test_list_customers_with_filters(self, client, user):
+        """Test that count respects filters."""
+        Customer.objects.create(user=user, name="Alice", email="alice@example.com")
+        Customer.objects.create(user=user, name="Bob", email="bob@example.com")
+        Customer.objects.create(user=user, name="Charlie", email="charlie@example.com")
+
+        response = client.get(self.endpoint)
+        assert response.status_code == 200
+        assert response.data["count"] == 3
+        assert len(response.data["results"]) == 3
+
+        response = client.get(f"{self.endpoint}?name=Alice")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert len(response.data["results"]) == 1
+
+        response = client.get(f"{self.endpoint}?email=bob@example.com")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert len(response.data["results"]) == 1
+
+    def test_list_customers_with_pagination(self, client, user):
+        """Test that count reflects all filtered results, not just the page."""
+        for i in range(15):
+            Customer.objects.create(user=user, name=f"Customer {i}", email=f"customer{i}@example.com")
+
+        response = client.get(f"{self.endpoint}?limit=10&offset=0")
+        assert response.status_code == 200
+        assert response.data["count"] == 15
+        assert len(response.data["results"]) == 10
+
+        response = client.get(f"{self.endpoint}?limit=10&offset=10")
+        assert response.status_code == 200
+        assert response.data["count"] == 15
+        assert len(response.data["results"]) == 5
