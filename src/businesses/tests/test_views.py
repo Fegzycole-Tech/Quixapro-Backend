@@ -169,3 +169,82 @@ class TestBusinessViewSet:
         assert response.status_code == 200
         assert response.data["count"] == 15
         assert len(response.data["results"]) == 5
+
+    def test_fuzzy_search_by_name(self, client, user):
+        """Test fuzzy search across business name."""
+        Business.objects.create(user=user, name="Tech Solutions LLC", email="tech@example.com", address="1 St", phone_number="111")
+        Business.objects.create(user=user, name="Digital Marketing Co", email="digital@example.com", address="2 St", phone_number="222")
+        Business.objects.create(user=user, name="Tech Innovations", email="innovations@example.com", address="3 St", phone_number="333")
+
+        response = client.get(f"{self.endpoint}?search=tech")
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+        response = client.get(f"{self.endpoint}?search=digital")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["name"] == "Digital Marketing Co"
+
+    def test_fuzzy_search_by_email(self, client, user):
+        """Test fuzzy search across business email."""
+        Business.objects.create(user=user, name="A", email="contact@techcorp.io", address="1 St", phone_number="111")
+        Business.objects.create(user=user, name="B", email="info@business.com", address="2 St", phone_number="222")
+        Business.objects.create(user=user, name="C", email="hello@techcorp.io", address="3 St", phone_number="333")
+
+        response = client.get(f"{self.endpoint}?search=techcorp.io")
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+        response = client.get(f"{self.endpoint}?search=hello")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["email"] == "hello@techcorp.io"
+
+    def test_fuzzy_search_by_address(self, client, user):
+        """Test fuzzy search across business address."""
+        Business.objects.create(user=user, name="A", email="a@test.com", address="Silicon Valley Tech Park", phone_number="111")
+        Business.objects.create(user=user, name="B", email="b@test.com", address="New York Business Center", phone_number="222")
+        Business.objects.create(user=user, name="C", email="c@test.com", address="Silicon Plaza", phone_number="333")
+
+        response = client.get(f"{self.endpoint}?search=Silicon")
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+        response = client.get(f"{self.endpoint}?search=Center")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["address"] == "New York Business Center"
+
+    def test_fuzzy_search_by_phone_number(self, client, user):
+        """Test fuzzy search across business phone number."""
+        Business.objects.create(user=user, name="A", email="a@test.com", address="1 St", phone_number="+1-555-1234")
+        Business.objects.create(user=user, name="B", email="b@test.com", address="2 St", phone_number="+1-555-5678")
+        Business.objects.create(user=user, name="C", email="c@test.com", address="3 St", phone_number="+1-444-1234")
+
+        response = client.get(f"{self.endpoint}?search=555")
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+        response = client.get(f"{self.endpoint}?search=5678")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["phone_number"] == "+1-555-5678"
+
+    def test_fuzzy_search_across_multiple_fields(self, client, user):
+        """Test fuzzy search works across all searchable fields."""
+        Business.objects.create(user=user, name="Cloud Services Inc", email="contact@cloud.io", address="Cloud Tower", phone_number="555-CLOUD")
+        Business.objects.create(user=user, name="Data Analytics", email="info@data.com", address="Analytics Plaza", phone_number="555-DATA")
+
+        response = client.get(f"{self.endpoint}?search=cloud")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["name"] == "Cloud Services Inc"
+
+        response = client.get(f"{self.endpoint}?search=nonexistent")
+        assert response.status_code == 200
+        assert response.data["count"] == 0
+        assert len(response.data["results"]) == 0

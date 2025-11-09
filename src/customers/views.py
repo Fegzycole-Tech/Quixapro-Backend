@@ -16,8 +16,9 @@ class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated, IsEmailVerified]
 
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ["name", "email"]
+    search_fields = ["name", "email", "address"]
     ordering_fields = ["name", "email", "address", "created_at"]
     ordering = ["-created_at"]
 
@@ -31,10 +32,15 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="List all customers for the authenticated user",
-        description="Returns paginated list of customers. The 'count' field in the response shows the total number of results matching the applied filters.",
+        description="Returns paginated list of customers. The 'count' field in the response shows the total number of results matching the applied filters and search.",
         parameters=[
-            OpenApiParameter("name", str, description="Filter by customer name"),
-            OpenApiParameter("email", str, description="Filter by customer email"),
+            OpenApiParameter("name", str, description="Exact filter by customer name"),
+            OpenApiParameter("email", str, description="Exact filter by customer email"),
+            OpenApiParameter(
+                "search",
+                str,
+                description="Fuzzy search across name, email, and address fields. Case-insensitive partial matching.",
+            ),
             OpenApiParameter(
                 "ordering",
                 str,
