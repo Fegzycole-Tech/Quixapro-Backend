@@ -16,8 +16,9 @@ class BusinessViewSet(viewsets.ModelViewSet):
     serializer_class = BusinessSerializer
     permission_classes = [IsAuthenticated, IsEmailVerified]
 
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ["name", "email"]
+    search_fields = ["name", "email", "address", "phone_number"]
     ordering_fields = ["name", "email", "address", "phone_number", "created_at"]
     ordering = ["-created_at"]
 
@@ -31,10 +32,15 @@ class BusinessViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="List all businesses for the authenticated user",
-        description="Returns paginated list of businesses. The 'count' field in the response shows the total number of results matching the applied filters.",
+        description="Returns paginated list of businesses. The 'count' field in the response shows the total number of results matching the applied filters and search.",
         parameters=[
-            OpenApiParameter("name", str, description="Filter by business name"),
-            OpenApiParameter("email", str, description="Filter by business email"),
+            OpenApiParameter("name", str, description="Exact filter by business name"),
+            OpenApiParameter("email", str, description="Exact filter by business email"),
+            OpenApiParameter(
+                "search",
+                str,
+                description="Fuzzy search across name, email, address, and phone_number fields. Case-insensitive partial matching.",
+            ),
             OpenApiParameter(
                 "ordering",
                 str,

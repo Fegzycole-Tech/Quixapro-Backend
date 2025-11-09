@@ -126,3 +126,67 @@ class TestCustomerViewSet:
         assert response.status_code == 200
         assert response.data["count"] == 15
         assert len(response.data["results"]) == 5
+
+    def test_fuzzy_search_by_name(self, client, user):
+        """Test fuzzy search across customer name."""
+        Customer.objects.create(user=user, name="John Doe", email="john@example.com", address="123 Main St")
+        Customer.objects.create(user=user, name="Jane Smith", email="jane@example.com", address="456 Oak Ave")
+        Customer.objects.create(user=user, name="Bob Johnson", email="bob@example.com", address="789 Pine Rd")
+
+        response = client.get(f"{self.endpoint}?search=john")
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+        response = client.get(f"{self.endpoint}?search=jane")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["name"] == "Jane Smith"
+
+    def test_fuzzy_search_by_email(self, client, user):
+        """Test fuzzy search across customer email."""
+        Customer.objects.create(user=user, name="Alice", email="alice.wonder@example.com", address="1 St")
+        Customer.objects.create(user=user, name="Bob", email="bob.builder@test.com", address="2 St")
+        Customer.objects.create(user=user, name="Charlie", email="charlie@example.com", address="3 St")
+
+        response = client.get(f"{self.endpoint}?search=example.com")
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+        response = client.get(f"{self.endpoint}?search=builder")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["email"] == "bob.builder@test.com"
+
+    def test_fuzzy_search_by_address(self, client, user):
+        """Test fuzzy search across customer address."""
+        Customer.objects.create(user=user, name="A", email="a@test.com", address="123 Main Street")
+        Customer.objects.create(user=user, name="B", email="b@test.com", address="456 Main Avenue")
+        Customer.objects.create(user=user, name="C", email="c@test.com", address="789 Oak Boulevard")
+
+        response = client.get(f"{self.endpoint}?search=Main")
+        assert response.status_code == 200
+        assert response.data["count"] == 2
+        assert len(response.data["results"]) == 2
+
+        response = client.get(f"{self.endpoint}?search=Boulevard")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["address"] == "789 Oak Boulevard"
+
+    def test_fuzzy_search_across_multiple_fields(self, client, user):
+        """Test fuzzy search works across all searchable fields."""
+        Customer.objects.create(user=user, name="Tech Corp", email="contact@techcorp.com", address="Tech Park")
+        Customer.objects.create(user=user, name="Innovation Inc", email="info@innovation.com", address="Innovation Plaza")
+        Customer.objects.create(user=user, name="Digital Solutions", email="hello@digital.com", address="Business Center")
+
+        response = client.get(f"{self.endpoint}?search=tech")
+        assert response.status_code == 200
+        assert response.data["count"] == 1
+        assert response.data["results"][0]["name"] == "Tech Corp"
+
+        response = client.get(f"{self.endpoint}?search=nonexistent")
+        assert response.status_code == 200
+        assert response.data["count"] == 0
+        assert len(response.data["results"]) == 0
