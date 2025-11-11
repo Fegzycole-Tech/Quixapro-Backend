@@ -67,7 +67,7 @@ class CloudinarySignatureViewTests(TestCase):
         mock_get_url.return_value = 'https://api.cloudinary.com/v1_1/test_cloud/image/upload'
 
         response = self.client.get(
-            '/api/cloudinary/signature/',
+            '/cloudinary/signature/',
             {
                 'folder': 'test_folder',
                 'allowed_formats': 'jpg,png',
@@ -85,7 +85,7 @@ class CloudinarySignatureViewTests(TestCase):
     def test_generate_signature_unauthenticated(self):
         self.client.force_authenticate(user=None)
 
-        response = self.client.get('/api/cloudinary/signature/')
+        response = self.client.get('/cloudinary/signature/')
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
@@ -95,7 +95,7 @@ class CloudinarySignatureViewTests(TestCase):
         self, mock_get_url, mock_generate_sig
     ):
         response = self.client.get(
-            '/api/cloudinary/signature/',
+            '/cloudinary/signature/',
             {'max_file_size': 'invalid'}
         )
 
@@ -112,6 +112,6 @@ class CloudinarySignatureViewTests(TestCase):
         )
         self.client.force_authenticate(user=unverified_user)
 
-        response = self.client.get('/api/cloudinary/signature/')
+        response = self.client.get('/cloudinary/signature/')
 
         assert response.status_code == status.HTTP_403_FORBIDDEN

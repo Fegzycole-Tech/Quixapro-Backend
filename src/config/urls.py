@@ -23,5 +23,5 @@ urlpatterns = [
     path('users/', include('users.user_urls')),
     path('customers/', include('customers.urls')),
     path('businesses/', include('businesses.urls')),
-    path('api/', include('common.urls')),
+    path('cloudinary/', include('common.urls')),
 ]
