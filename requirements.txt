@@ -14,3 +14,4 @@ cryptography==44.0.0
 pybars3==0.9.7
 django-cors-headers==4.6.0
 django-filter>=24.3
+cloudinary==1.41.0
